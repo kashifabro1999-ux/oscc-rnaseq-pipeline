@@ -1,0 +1,20 @@
+# Data (keep public data out of git history if large; add explicitly if desired)
+data/*.tsv
+!data/.gitkeep
+
+# Pipeline outputs
+results/
+plots/
+logs/*.log
+
+# Python
+__pycache__/
+*.pyc
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# OS
+.DS_Store
