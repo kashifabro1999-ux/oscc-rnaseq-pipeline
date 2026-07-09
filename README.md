@@ -31,8 +31,8 @@ This repository contains:
 ## Quick start (local)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+git clone https://github.com/kashifabro1999-ux/oscc-rnaseq-pipeline.git
+cd oscc-rnaseq-pipeline
 
 python3 oscc_pipeline.py setup
 # place your data/vst_counts.tsv, data/sample_info.tsv, data/deseq2_results.tsv
