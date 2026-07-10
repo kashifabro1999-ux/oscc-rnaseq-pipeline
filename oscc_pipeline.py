@@ -441,3 +441,20 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    try:
+        import sys
+        import subprocess
+        from pathlib import Path
+
+        if "run" in sys.argv:
+            organizer = Path(__file__).resolve().parent / "organize_outputs.py"
+            if organizer.exists():
+                print("[INFO] Organizing plots into sorted folders...")
+                subprocess.run(
+                    [sys.executable, str(organizer)],
+                    cwd=str(organizer.parent),
+                    check=False
+                )
+    except Exception as e:
+        print(f"[WARN] Output organization skipped: {e}")
