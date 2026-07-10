@@ -1,12 +1,12 @@
 ## install_bioc_packages.R
-## Installs every Bioconductor package used across the 20 pipeline scripts.
-## Kept as its own file (separate Docker layer from the CRAN install) so a
-## rebuild triggered by an app-code change doesn't force reinstalling the
-## entire Bioconductor stack from scratch.
+options(repos = c(CRAN = "https://packagemanager.posit.co/cran/2023-11-15"))
 
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager", repos = "https://cloud.r-project.org")
+  install.packages("BiocManager")
 }
+
+dir.create("~/.R", showWarnings = FALSE)
+writeLines("CXX11STD = -std=gnu++14", con = "~/.R/Makevars")
 
 pkgs <- c(
   "DESeq2",
@@ -27,4 +27,4 @@ missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
 if (length(missing) > 0) {
   stop("Failed to install Bioconductor package(s): ", paste(missing, collapse = ", "))
 }
-cat("All Bioconductor packages installed successfully.\n")
+cat("All Bioconductor packages installed successfully (pinned to 2023-11-15 CRAN snapshot).\n")
