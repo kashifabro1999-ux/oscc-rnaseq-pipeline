@@ -49,7 +49,7 @@ hallmark_sets <- hallmark %>%
 gsea_hallmark <- GSEA(
   geneList = gene_list,
   TERM2GENE = hallmark_sets,
-  pvalueCutoff = 0.05,
+  pvalueCutoff = 1,
   verbose = FALSE
 )
 

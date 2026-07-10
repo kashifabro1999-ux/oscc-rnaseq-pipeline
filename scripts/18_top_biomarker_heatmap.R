@@ -1,245 +1,106 @@
-library(pheatmap)
-library(RColorBrewer)
+suppressPackageStartupMessages({
+  library(pheatmap)
+  library(dplyr)
+})
 
-# -----------------------------
-# LOAD FILES
-# -----------------------------
+dir.create("plots", showWarnings = FALSE, recursive = TRUE)
+dir.create("results", showWarnings = FALSE, recursive = TRUE)
 
-expr <- read.delim(
-  "data/vst_counts.tsv",
-  row.names = 1,
-  check.names = FALSE
+vst <- read.delim("data/vst_counts.tsv", check.names = FALSE)
+priority <- read.delim("results/biomarker_priority_table.tsv", check.names = FALSE)
+sample_info <- read.delim("data/sample_info.tsv", check.names = FALSE)
+
+id_col <- colnames(vst)[1]
+vst[[id_col]] <- as.character(vst[[id_col]])
+priority$EntrezID <- as.character(priority$EntrezID)
+
+target_genes <- c(
+  "PLAU", "MMP14", "COL1A1", "MMP9",
+  "LPL", "ACACB", "SLC2A4", "PPARG",
+  "GPD1", "PLIN1", "PCK1", "ADH1B", "CYP3A4"
 )
 
-meta <- read.delim(
-  "data/sample_info.tsv",
-  check.names = FALSE
-)
+priority_sel <- priority %>%
+  filter(GeneSymbol %in% target_genes)
 
-hub <- read.delim(
-  "results/top30_hub_genes.tsv",
-  check.names = FALSE
-)
+if (nrow(priority_sel) < 2) {
+  priority_sel <- priority %>%
+    arrange(desc(PriorityScore)) %>%
+    head(30)
+}
 
-# -----------------------------
-# BIOMARKER GENES
-# -----------------------------
+match_idx <- match(priority_sel$EntrezID, vst[[id_col]])
+valid <- !is.na(match_idx)
 
-genes <- c(
-  "COL1A1",
-  "MMP14",
-  "PLAU",
-  "MMP9",
-  "PPARG",
-  "ACACB",
-  "GPD1",
-  "LPL",
-  "PCK1",
-  "PLIN1",
-  "SLC2A4",
-  "ADH1B",
-  "CYP3A4"
-)
+priority_sel <- priority_sel[valid, , drop = FALSE]
+vst_sel <- vst[match_idx[valid], , drop = FALSE]
 
-# -----------------------------
-# MAP GENE SYMBOLS
-# -----------------------------
+if (nrow(vst_sel) < 2) {
+  stop("Fewer than 2 biomarker genes found in VST after EntrezID matching.")
+}
 
-symbol_map <- hub$EntrezID
-names(symbol_map) <- hub$GeneSymbol
+expr <- as.matrix(vst_sel[, -1])
+mode(expr) <- "numeric"
+rownames(expr) <- make.unique(priority_sel$GeneSymbol)
 
-available_genes <- genes[
-  genes %in% names(symbol_map)
-]
+sample_col <- colnames(sample_info)[1]
+possible_sample_cols <- colnames(sample_info)[tolower(colnames(sample_info)) %in% c("sample", "sample_id", "sampleid", "id")]
+if (length(possible_sample_cols) > 0) {
+  sample_col <- possible_sample_cols[1]
+}
 
-entrez_ids <- as.character(
-  symbol_map[available_genes]
-)
+common_samples <- intersect(as.character(sample_info[[sample_col]]), colnames(expr))
 
-entrez_ids <- entrez_ids[
-  entrez_ids %in% rownames(expr)
-]
+annotation_col <- NULL
 
-# -----------------------------
-# EXTRACT MATRIX
-# -----------------------------
+if (length(common_samples) >= 2) {
+  expr <- expr[, common_samples, drop = FALSE]
+  sample_info <- sample_info[match(common_samples, sample_info[[sample_col]]), , drop = FALSE]
 
-mat <- expr[entrez_ids, ]
+  condition_cols <- colnames(sample_info)[tolower(colnames(sample_info)) %in% c("condition", "group", "diagnosis", "type")]
+  if (length(condition_cols) > 0) {
+    annotation_col <- data.frame(Condition = as.factor(sample_info[[condition_cols[1]]]))
+    rownames(annotation_col) <- common_samples
+  }
+}
 
-gene_symbols <- names(symbol_map)[
-  match(
-    rownames(mat),
-    as.character(symbol_map)
-  )
-]
+expr <- expr[apply(expr, 1, sd, na.rm = TRUE) > 0, , drop = FALSE]
 
-rownames(mat) <- gene_symbols
+if (nrow(expr) < 2) {
+  stop("Fewer than 2 variable biomarker genes available for clustering.")
+}
 
-# -----------------------------
-# ORDER SAMPLES
-# -----------------------------
-
-control_samples <- meta$sample[
-  meta$condition == "Control"
-]
-
-tumor_samples <- meta$sample[
-  meta$condition == "Tumor"
-]
-
-ordered_samples <- c(
-  control_samples,
-  tumor_samples
-)
-
-ordered_samples <- ordered_samples[
-  ordered_samples %in% colnames(mat)
-]
-
-mat <- mat[, ordered_samples]
-
-# -----------------------------
-# SCALE MATRIX
-# -----------------------------
-
-mat_scaled <- t(
-  scale(
-    t(mat)
-  )
-)
-
-# -----------------------------
-# ANNOTATION
-# -----------------------------
-
-annotation_col <- data.frame(
-  Condition = factor(
-    c(
-      rep(
-        "Control",
-        length(control_samples)
-      ),
-      rep(
-        "Tumor",
-        length(tumor_samples)
-      )
-    ),
-    levels = c(
-      "Control",
-      "Tumor"
-    )
-  )
-)
-
-rownames(annotation_col) <- ordered_samples
-
-# -----------------------------
-# COLORS
-# -----------------------------
-
-ann_colors <- list(
-  Condition = c(
-    Control = "#00BFC4",
-    Tumor = "#F8766D"
-  )
-)
-
-heat_colors <- colorRampPalette(
-  c(
-    "#313695",
-    "#4575B4",
-    "#74ADD1",
-    "#ABD9E9",
-    "#FFFFBF",
-    "#FDAE61",
-    "#F46D43",
-    "#D73027"
-  )
-)(100)
-
-# -----------------------------
-# PNG OUTPUT
-# -----------------------------
-
-png(
-  "plots/top_biomarker_heatmap.png",
-  width = 6900,
-  height = 4100,
-  res = 300
-)
+expr_z <- t(scale(t(expr)))
+expr_z[is.na(expr_z)] <- 0
 
 pheatmap(
-  mat_scaled,
-
+  expr_z,
   annotation_col = annotation_col,
-  annotation_colors = ann_colors,
-
-  cluster_rows = TRUE,
-  cluster_cols = FALSE,
-
-  fontsize_row = 22,
-  fontsize_col = 16,
-
-  border_color = NA,
-
-  color = heat_colors,
-
-  show_colnames = TRUE,
-  show_rownames = TRUE,
-
-  angle_col = 90,
-
-  treeheight_row = 80,
-  treeheight_col = 0,
-
-  main = "Top Biomarker Expression Heatmap"
+  show_colnames = FALSE,
+  fontsize_row = 9,
+  main = "Prioritized OSCC Candidate Biomarkers",
+  filename = "plots/top_biomarker_heatmap.png",
+  width = 10,
+  height = 7
 )
 
-dev.off()
-
-# -----------------------------
-# PDF OUTPUT
-# -----------------------------
-
-pdf(
-  "plots/top_biomarker_heatmap.pdf",
-  width = 28,
-  height = 16
-)
-
+pdf("plots/top_biomarker_heatmap.pdf", width = 10, height = 7)
 pheatmap(
-  mat_scaled,
-
+  expr_z,
   annotation_col = annotation_col,
-  annotation_colors = ann_colors,
-
-  cluster_rows = TRUE,
-  cluster_cols = FALSE,
-
-  fontsize_row = 18,
-  fontsize_col = 8,
-
-  border_color = NA,
-
-  color = heat_colors,
-
-  show_colnames = TRUE,
-  show_rownames = TRUE,
-
-  angle_col = 90,
-
-  treeheight_row = 80,
-  treeheight_col = 0,
-
-  main = "Top Biomarker Expression Heatmap"
+  show_colnames = FALSE,
+  fontsize_row = 9,
+  main = "Prioritized OSCC Candidate Biomarkers"
 )
-
 dev.off()
 
-# -----------------------------
-# DONE
-# -----------------------------
-
-cat(
-  "Publication-quality heatmap generated successfully.\n"
+write.table(
+  priority_sel,
+  "results/top_biomarker_heatmap_genes.tsv",
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
 )
+
+cat("Top biomarker heatmap completed successfully.\n")
+cat("Genes plotted:", nrow(expr_z), "\n")
