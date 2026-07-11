@@ -100,7 +100,22 @@ def install_r_packages():
         print("[WARN] install_packages.R not found. Skipping R package install.")
         return 0
 
-    return run(["Rscript", str(installer)]).returncode
+    code = run(["Rscript", str(installer)]).returncode
+
+    if code != 0:
+        print("[ERROR] R package installer failed.")
+        return code
+
+    check_code = subprocess.run(
+        [
+            "Rscript",
+            "-e",
+            "pkgs <- c('clusterProfiler','ReactomePA','enrichplot','treeio','ggtree','pathview','STRINGdb','fgsea','ggridges','org.Hs.eg.db'); missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if(length(missing)>0){cat('Missing:', paste(missing, collapse=', '), '\\n'); quit(status=1)} else {cat('[OK] Critical R packages verified.\\n')}"
+        ],
+        cwd=ROOT
+    ).returncode
+
+    return check_code
 
 
 def install_all():
@@ -114,8 +129,9 @@ def install_all():
         print("\n[OK] Dependency setup completed.")
         return 0
 
-    print("\n[WARN] Some packages may not have installed correctly.")
-    print("Run this again if the pipeline reports missing packages:")
+    print("\n[ERROR] Dependency setup did not complete successfully.")
+    print("The analysis will not run safely until dependencies are fixed.")
+    print("Run again:")
     print("python3 setup_pipeline.py --install-only")
     return 1
 
@@ -146,12 +162,58 @@ def copy_input_file(src, canonical):
     raw_dst = RAW_DIR / canonical
     data_dst = DATA_DIR / canonical
 
-    shutil.copy2(src, raw_dst)
-    shutil.copy2(src, data_dst)
+    try:
+        # Remove old standardized destination files/links only.
+        if data_dst.exists() or data_dst.is_symlink():
+            data_dst.unlink()
 
-    print(f"[OK] Copied and renamed:")
-    print(f"     raw_data/{canonical}")
-    print(f"     data/{canonical}")
+        if raw_dst.exists() or raw_dst.is_symlink():
+            raw_dst.unlink()
+
+        # Store canonical raw file without wasting space when possible.
+        # Hardlink = no duplicate storage on same filesystem.
+        try:
+            os.link(src, raw_dst)
+            raw_mode = "hardlink"
+        except Exception:
+            shutil.copy2(src, raw_dst)
+            raw_mode = "copy"
+
+        # Make data/ point to raw_data/ without duplicating large files.
+        try:
+            os.link(raw_dst, data_dst)
+            data_mode = "hardlink"
+        except Exception:
+            try:
+                data_dst.symlink_to(raw_dst)
+                data_mode = "symlink"
+            except Exception:
+                shutil.copy2(raw_dst, data_dst)
+                data_mode = "copy"
+
+        print(f"[OK] Added and standardized:")
+        print(f"     raw_data/{canonical} ({raw_mode})")
+        print(f"     data/{canonical} ({data_mode} to raw_data file)")
+        return True
+
+    except OSError as e:
+        if getattr(e, "errno", None) == 28:
+            print("\n[STORAGE ERROR] No space left on device.")
+            print("The program will not close.")
+            print("Please free space and try this file again.")
+            print("Suggested cleanup commands:")
+            print("  rm -rf ~/.cache/pip")
+            print("  rm -rf results plots logs plots_sorted")
+            print("  find data raw_data -type f ! -name .gitkeep -delete")
+            try:
+                if data_dst.exists() or data_dst.is_symlink():
+                    data_dst.unlink()
+                if raw_dst.exists() or raw_dst.is_symlink():
+                    raw_dst.unlink()
+            except Exception:
+                pass
+            return False
+        raise
 
 
 def prompt_file(key, cfg):
@@ -193,8 +255,10 @@ def prompt_file(key, cfg):
             print("The program will not close; try again.")
             continue
 
-        copy_input_file(src, canonical)
-        return
+        ok = copy_input_file(src, canonical)
+        if ok:
+            return
+        continue
 
 
 def prepare_data():
