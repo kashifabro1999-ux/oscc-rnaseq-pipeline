@@ -100,6 +100,16 @@ def install_r_packages():
         print("[WARN] install_packages.R not found. Skipping R package install.")
         return 0
 
+    if shutil.which("Rscript") is None:
+        print("\n[SYSTEM REQUIREMENT MISSING] Rscript was not found.")
+        print("Please install R before running this pipeline.")
+        print("\nFor Ubuntu, Google Cloud Shell, or WSL2 Ubuntu, run:")
+        print("sudo apt update")
+        print("sudo apt install -y r-base r-base-dev build-essential gfortran make cmake libcurl4-openssl-dev libssl-dev libxml2-dev libpng-dev libjpeg-dev libtiff5-dev libcairo2-dev libxt-dev libfontconfig1-dev libfreetype6-dev libharfbuzz-dev libfribidi-dev")
+        print("\nAfter installation, run again:")
+        print("python3 setup_pipeline.py --install-only")
+        return 1
+
     code = run(["Rscript", str(installer)]).returncode
 
     if code != 0:
