@@ -1,5 +1,25 @@
 # OSCC RNA-seq Integrative Analysis Pipeline
 
+## Beginner Installation
+
+New users should first read:
+
+[INSTALLATION.md](INSTALLATION.md)
+
+Quick start after installing system requirements:
+
+    git clone https://github.com/kashifabro1999-ux/oscc-rnaseq-pipeline.git
+    cd oscc-rnaseq-pipeline
+    python3 pipeline_menu.py
+
+Inside the menu:
+
+    setup
+    run all
+    organize
+    zip
+    quit
+
 Reproducible pipeline and tooling for an integrative whole-transcriptome
 RNA-seq analysis of oral squamous cell carcinoma (OSCC), combining public
 datasets from five geographic regions (Taiwan, USA, India, Germany, China).
