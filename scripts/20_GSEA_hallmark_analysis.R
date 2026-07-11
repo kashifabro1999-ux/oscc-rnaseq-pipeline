@@ -36,7 +36,7 @@ gene_list <- sort(gene_list, decreasing = TRUE)
 
 hallmark <- msigdbr(
   species = "Homo sapiens",
-  category = "H"
+  collection = "H"
 )
 
 hallmark_sets <- hallmark %>%

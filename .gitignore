@@ -18,3 +18,19 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# OSCC pipeline local/generated files
+raw_data/*
+!raw_data/.gitkeep
+data/*
+!data/.gitkeep
+results/
+plots/
+plots_sorted/
+logs/
+*.zip
+Rplots.pdf
+stringdb_cache/
+backup_synthetic_*/
+__pycache__/
+.oscc_setup_complete

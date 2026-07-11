@@ -439,22 +439,78 @@ def main():
     rc = args.func(args)
     sys.exit(rc if isinstance(rc, int) else 0)
 
-if __name__ == "__main__":
-    main()
+# OSCC_PIPELINE_MANAGED_MAIN_START
+def _oscc_preflight_install_if_needed():
+    try:
+        import os
+        import sys
+        import subprocess
+        from pathlib import Path
 
+        if "run" not in sys.argv:
+            return
+
+        if os.environ.get("OSCC_SKIP_AUTO_INSTALL") == "1":
+            return
+
+        root = Path(__file__).resolve().parent
+        marker = root / ".oscc_setup_complete"
+        setup_script = root / "setup_pipeline.py"
+
+        watched = [
+            root / "requirements.txt",
+            root / "install_packages.R",
+            setup_script
+        ]
+
+        needs_setup = not marker.exists()
+        if marker.exists():
+            marker_time = marker.stat().st_mtime
+            for f in watched:
+                if f.exists() and f.stat().st_mtime > marker_time:
+                    needs_setup = True
+                    break
+
+        if needs_setup and setup_script.exists():
+            print("[INFO] First run or setup files changed. Installing/checking dependencies...")
+            code = subprocess.call(
+                [sys.executable, str(setup_script), "--install-only", "--non-interactive"],
+                cwd=str(root)
+            )
+            if code != 0:
+                print("[WARN] Dependency installer reported a problem.")
+                print("[INFO] You can manually run: python3 setup_pipeline.py --install-only")
+
+    except Exception as e:
+        print(f"[WARN] Dependency preflight skipped: {e}")
+
+
+def _oscc_organize_after_run():
     try:
         import sys
         import subprocess
         from pathlib import Path
 
-        if "run" in sys.argv:
-            organizer = Path(__file__).resolve().parent / "organize_outputs.py"
-            if organizer.exists():
-                print("[INFO] Organizing plots into sorted folders...")
-                subprocess.run(
-                    [sys.executable, str(organizer)],
-                    cwd=str(organizer.parent),
-                    check=False
-                )
+        if "run" not in sys.argv:
+            return
+
+        root = Path(__file__).resolve().parent
+        organizer = root / "organize_outputs.py"
+
+        if organizer.exists():
+            print("[INFO] Organizing plots into sorted folders...")
+            subprocess.run(
+                [sys.executable, str(organizer)],
+                cwd=str(root),
+                check=False
+            )
+
     except Exception as e:
         print(f"[WARN] Output organization skipped: {e}")
+
+
+if __name__ == "__main__":
+    _oscc_preflight_install_if_needed()
+    main()
+    _oscc_organize_after_run()
+# OSCC_PIPELINE_MANAGED_MAIN_END
