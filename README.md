@@ -88,15 +88,7 @@ All RNA-seq data used with this pipeline is drawn from public repositories
 (GEO/SRA). No proprietary or patient-identifiable data is included in this
 repository.
 
-## Citation / context
-
-This pipeline supports the manuscript *"Integrative Whole-Transcriptome
-Profiling of Oral Squamous Cell Carcinoma Using Public RNA-seq Datasets from
-Five Geographic Regions Identifies Candidate Diagnostic and Prognostic
-Biomarkers."* Candidate biomarkers identified (PLAU, MMP14, COL1A1, MMP9,
-and metabolic/tissue-identity genes LPL, ACACB, SLC2A4, PPARG, GPD1, PLIN1,
-PCK1, ADH1B) are discovery-level and require independent experimental
-validation.
+##.
 
 ## License
 
